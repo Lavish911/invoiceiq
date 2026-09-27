@@ -1,0 +1,8 @@
+com\invoiceiq\TenantContextFilterTest.class
+com\invoiceiq\TenantIntegrationTest.class
+com\invoiceiq\auth\controller\SecurityIntegrationTest.class
+com\invoiceiq\FlywayMigrationIntegrationTest.class
+com\invoiceiq\InvoiceIqApplicationTests.class
+com\invoiceiq\auth\controller\TokenRotationTest.class
+com\invoiceiq\TestcontainersConfiguration.class
+com\invoiceiq\auth\controller\AuthControllerTest.class
