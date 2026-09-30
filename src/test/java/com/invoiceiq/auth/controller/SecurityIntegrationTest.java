@@ -1,4 +1,4 @@
-package com.invoiceiq.auth.controller;
+package com.invoiceiq.auth.controller; // Force IDE Sync
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.invoiceiq.auth.dto.AuthResponse;
@@ -48,6 +48,9 @@ class SecurityIntegrationTest {
     private TenantRepository tenantRepository;
 
     @Autowired
+    private org.springframework.jdbc.core.JdbcTemplate jdbcTemplate;
+
+    @Autowired
     private InvoiceRepository invoiceRepository;
 
     @Autowired
@@ -66,6 +69,8 @@ class SecurityIntegrationTest {
 
     @BeforeEach
     void setUp() throws Exception {
+        jdbcTemplate.execute("DELETE FROM extraction_result");
+        jdbcTemplate.execute("DELETE FROM document");
         invoiceRepository.deleteAll();
         userRepository.deleteAll();
         tenantRepository.deleteAll();
@@ -99,6 +104,7 @@ class SecurityIntegrationTest {
         invoiceA = new Invoice();
         invoiceA.setId(UUID.randomUUID());
         invoiceA.setTenantId(tenantA.getId());
+        invoiceA.setSubmitterId(userA.getId());
         invoiceA.setInvoiceNumber("INV-A");
         invoiceA.setTotalAmount(new BigDecimal("100.00"));
         invoiceA.setStatus(InvoiceStatus.DRAFT);
@@ -123,8 +129,8 @@ class SecurityIntegrationTest {
         mockMvc.perform(get("/api/invoices") // Assuming GET /api/invoices returns invoices
                 .header("Authorization", "Bearer " + tokenA))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].invoiceNumber").value("INV-A"));
+                .andExpect(jsonPath("$.content", hasSize(1)))
+                .andExpect(jsonPath("$.content[0].invoiceNumber").value("INV-A"));
     }
 
     @Test
@@ -132,7 +138,7 @@ class SecurityIntegrationTest {
         mockMvc.perform(get("/api/invoices")
                 .header("Authorization", "Bearer " + tokenB))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
+                .andExpect(jsonPath("$.content", hasSize(0)));
     }
     
     @Test
@@ -142,14 +148,14 @@ class SecurityIntegrationTest {
                 .header("Authorization", "Bearer " + tokenB)
                 .header("X-Tenant-ID", tenantA.getId().toString()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
+                .andExpect(jsonPath("$.content", hasSize(0)));
     }
 
     @Test
     void testAdminCanDeleteInvoice() throws Exception {
         mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/invoices/" + invoiceA.getId())
                 .header("Authorization", "Bearer " + tokenA))
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
     }
 
     @Test

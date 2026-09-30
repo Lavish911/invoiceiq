@@ -1,0 +1,48 @@
+# Build output
+target/
+*.class
+*.jar
+*.war
+
+# Maven
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE
+.vscode/
+.idea/
+*.iml
+*.eclipse
+.settings/
+.classpath
+.project
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Local runtime data (generated uploads / storage)
+data/
+
+# Logs and scratch files
+*.log
+stdout.log
+output_template.txt
+
+# Environment / secrets (never commit real values)
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes are managed by Docker, not git
+# (named volumes contain local Postgres/Redis data)

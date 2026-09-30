@@ -77,6 +77,13 @@
             <version>2.6.0</version>
         </dependency>
 
+        <!-- JobRunr for asynchronous processing -->
+        <dependency>
+            <groupId>org.jobrunr</groupId>
+            <artifactId>jobrunr-spring-boot-3-starter</artifactId>
+            <version>7.2.1</version>
+        </dependency>
+
         <!-- Testing -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -133,6 +140,7 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
+                    <mainClass>com.invoiceiq.InvoiceIqApplication</mainClass>
                     <excludes>
                         <exclude>
                             <groupId>org.projectlombok</groupId>
@@ -144,4 +152,5 @@
         </plugins>
     </build>
 </project>
+<!-- Trigger IDE Sync -->
 

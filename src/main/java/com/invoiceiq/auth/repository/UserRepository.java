@@ -11,6 +11,8 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByEmailAndTenantId(String email, UUID tenantId);
     
+    Optional<User> findByIdAndTenantId(UUID id, UUID tenantId);
+    
     // Used by authentication provider across tenants
     java.util.List<User> findByEmail(String email);
 }
