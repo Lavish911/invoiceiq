@@ -2,6 +2,25 @@
 
 Prerequisite: a tenant and users exist (there is no self-registration endpoint — seed them directly, e.g. via the H2 console in tests or SQL inserts). The walkthrough below uses field names verified against the DTOs; every step was cross-checked with `docs/API.md`.
 
+## 0. Seed a tenant + admin user (local dev only)
+
+There is no sign-up endpoint, so insert one tenant and one user straight into PostgreSQL
+(the password below is the BCrypt hash of `password` — local development only):
+
+```sql
+INSERT INTO tenant (id, name) VALUES
+  ('11111111-1111-1111-1111-111111111111', 'Local Demo Co');
+
+INSERT INTO users (id, tenant_id, email, password_hash, role) VALUES
+  ('22222222-2222-2222-2222-222222222222',
+   '11111111-1111-1111-1111-111111111111',
+   'admin@local.test',
+   '$2b$12$b0YbbfS5meSja12hms3bauqNKL2AkjW/HxqsuxuGC6GaozZ7xZ9/y',
+   'ADMIN');
+```
+
+Log in below with `admin@local.test` / `password` / tenant `11111111-1111-1111-1111-111111111111`.
+
 ## 1. Login
 
 ```bash
