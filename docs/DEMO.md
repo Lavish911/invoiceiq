@@ -5,7 +5,8 @@ Prerequisite: a tenant and users exist (there is no self-registration endpoint �
 ## 0. Seed a tenant + admin user (local dev only)
 
 There is no sign-up endpoint, so insert one tenant and one user straight into PostgreSQL
-(the password below is the BCrypt hash of `password` — local development only):
+(boot the backend once first so Flyway creates the tables, then run this;
+the password below is the BCrypt hash of `password` — local development only):
 
 ```sql
 INSERT INTO tenant (id, name) VALUES
