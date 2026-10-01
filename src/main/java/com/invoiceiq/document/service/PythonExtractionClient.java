@@ -25,10 +25,12 @@ public class PythonExtractionClient {
     public PythonExtractionClient(
             RestTemplateBuilder restTemplateBuilder,
             @Value("${app.ocr.service.url:http://localhost:8000}") String ocrServiceUrl,
-            @Value("${AI_SERVICE_TOKEN:default_dev_token}") String aiServiceToken) {
+            @Value("${AI_SERVICE_TOKEN:default_dev_token}") String aiServiceToken,
+            @Value("${app.ocr.service.connect-timeout:5}") long connectTimeout,
+            @Value("${app.ocr.service.read-timeout:60}") long readTimeout) {
         this.restTemplate = restTemplateBuilder
-                .setConnectTimeout(Duration.ofSeconds(5))
-                .setReadTimeout(Duration.ofSeconds(60))
+                .setConnectTimeout(Duration.ofSeconds(connectTimeout))
+                .setReadTimeout(Duration.ofSeconds(readTimeout))
                 .build();
         this.ocrServiceUrl = ocrServiceUrl;
         this.aiServiceToken = aiServiceToken;

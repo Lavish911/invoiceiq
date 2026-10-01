@@ -1,0 +1,17 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**
+!pom.xml
+!mvnw
+!mvnw.cmd
+.git/
+.vscode/
+.idea/
+*.iml
+.DS_Store
+python-ocr/
+data/
+*.log
+.env
+.env.*
+!.env.example

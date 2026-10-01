@@ -9,9 +9,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import java.util.UUID;
 
 @Service
+@ConditionalOnProperty(name = "app.storage.type", havingValue = "local", matchIfMissing = true)
 public class LocalFilesystemStorageService implements DocumentStorageService {
 
     private final Path storageDirectory;

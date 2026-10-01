@@ -2,56 +2,41 @@ services:
   postgres:
     image: postgres:15-alpine
     container_name: invoiceiq-postgres
+    restart: always
     environment:
-      POSTGRES_USER: invoiceiq
-      POSTGRES_PASSWORD: invoiceiq_password
-      POSTGRES_DB: invoiceiq_db
+      POSTGRES_USER: ${POSTGRES_USER:-invoiceiq}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-invoiceiq_password}
+      POSTGRES_DB: ${POSTGRES_DB:-invoiceiq_db}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U invoiceiq -d invoiceiq_db"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-invoiceiq} -d ${POSTGRES_DB:-invoiceiq_db}"]
+      interval: 10s
       timeout: 5s
       retries: 5
 
   redis:
     image: redis:7-alpine
     container_name: invoiceiq-redis
+    restart: always
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
+      interval: 10s
       timeout: 5s
       retries: 5
-
-# TODO: MinIO will be enabled when invoice file storage is implemented.
-# Currently disabled because the quay.io/minio/minio image cannot be pulled anonymously in some environments.
-#  minio:
-#    image: quay.io/minio/minio
-#    container_name: invoiceiq-minio
-#    ports:
-#      - "9000:9000"
-#      - "9001:9001"
-#    environment:
-#      MINIO_ROOT_USER: minioadmin
-#      MINIO_ROOT_PASSWORD: minioadmin
-#    command: server /data --console-address ":9001"
-#    volumes:
-#      - minio_data:/data
-#    healthcheck:
-#      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-#      interval: 5s
-#      timeout: 5s
-#      retries: 5
 
   python-ocr:
     build: ./python-ocr
     container_name: invoiceiq-ocr
+    restart: always
+    environment:
+      - AI_SERVICE_TOKEN=${AI_SERVICE_TOKEN:-default_dev_token}
     ports:
       - "8000:8000"
     healthcheck:
@@ -60,7 +45,37 @@ services:
       timeout: 5s
       retries: 3
 
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: invoiceiq-backend
+    restart: always
+    environment:
+      - SPRING_PROFILES_ACTIVE=docker
+      - POSTGRES_URL=jdbc:postgresql://postgres:5432/${POSTGRES_DB:-invoiceiq_db}
+      - POSTGRES_USER=${POSTGRES_USER:-invoiceiq}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-invoiceiq_password}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - AI_SERVICE_URL=http://python-ocr:8000
+      - AI_SERVICE_TOKEN=${AI_SERVICE_TOKEN:-default_dev_token}
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      python-ocr:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
   redis_data:
-
