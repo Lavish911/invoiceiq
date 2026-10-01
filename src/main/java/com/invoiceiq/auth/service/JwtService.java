@@ -28,6 +28,16 @@ public class JwtService {
     @Value("${application.security.jwt.refresh-token.expiration}")
     private long refreshExpiration;
 
+    @jakarta.annotation.PostConstruct
+    void validateSecretConfigured() {
+        // Fail fast: an empty/missing JWT secret must never silently boot into
+        // broken authentication (e.g. unset JWT_SECRET_KEY in production).
+        if (secretKey == null || secretKey.isBlank()) {
+            throw new IllegalStateException(
+                    "JWT secret is not configured. Set the JWT_SECRET_KEY environment variable.");
+        }
+    }
+
     public String extractUsername(String token) {
         return extractClaim(token, Claims::getSubject);
     }

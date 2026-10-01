@@ -34,3 +34,15 @@ app:
       region: ${S3_REGION:us-east-1}
       access-key: ${S3_ACCESS_KEY:}
       secret-key: ${S3_SECRET_KEY:}
+
+# JobRunr background job server: REQUIRED in every real runtime so enqueued
+# extraction jobs are actually processed. Uses PostgreSQL storage. Deliberately
+# absent from test profiles so tests keep deterministic, server-free behavior.
+# NOTE: the property prefix must be "org.jobrunr" — a "jobrunr.*" entry binds
+# to nothing and silently leaves defaults in place.
+org:
+  jobrunr:
+    background-job-server:
+      enabled: true
+    dashboard:
+      enabled: false

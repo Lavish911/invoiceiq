@@ -14,7 +14,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest
 @ActiveProfiles("testcontainers")
-@Testcontainers(disabledWithoutDocker = true)
+// Docker is a REQUIRED test prerequisite: without it this class must FAIL LOUDLY,
+// never silently skip (a skipped run must not be mistaken for full verification).
+@Testcontainers
 public class FlywayMigrationIntegrationTest {
 
     @Container

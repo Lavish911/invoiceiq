@@ -21,3 +21,13 @@ spring:
     redis:
       host: localhost
       port: 6379
+
+# JobRunr background job server: REQUIRED in every real runtime so enqueued
+# extraction jobs are actually processed. Uses PostgreSQL storage. Deliberately
+# absent from test profiles so tests keep deterministic, server-free behavior.
+org:
+  jobrunr:
+    background-job-server:
+      enabled: true
+    dashboard:
+      enabled: false

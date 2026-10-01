@@ -24,6 +24,6 @@ application:
       refresh-token:
         expiration: 604800000 # 7 days
 
-jobrunr:
-  dashboard:
-    enabled: false
+# NOTE: JobRunr honors only the "org.jobrunr.*" prefix. A "jobrunr.*" entry
+# binds to nothing, so JobRunr behavior is configured per runtime profile
+# (application-local.yml / application-docker.yml), not here.
