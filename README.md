@@ -20,7 +20,7 @@ Manual invoice processing is slow, error-prone, and hard to audit across organiz
 - **Idempotency**: `X-Idempotency-Key` with payload-hash conflict detection + partial unique index
 - **Optimistic locking**: `@Version` + explicit version checks → HTTP 409 on races
 - **Upload security**: type/size/filename validation, basename sanitization, storage containment checks
-- **Docker Compose** for Postgres, Redis, and the OCR service
+- **Docker Compose** for PostgreSQL, Redis, the OCR service, and the Spring Boot backend container
 - **Tests**: 48 Java integration tests + 6 Python tests, green, zero skipped
 
 ## Architecture
@@ -38,7 +38,7 @@ graph TD
     FastAPI -->|pytesseract| Tesseract[Tesseract OCR]
 ```
 
-Notes that differ from a first glance at the repo: **JobRunr persists jobs in PostgreSQL** (Spring Boot auto-configuration), not Redis — Redis ships in Compose but is currently unused and reserved for future caching/rate-limiting. There is **no Java container**; Compose runs infrastructure + OCR only. MinIO/S3 is deferred; storage is local filesystem.
+Notes: the backend itself runs as a Docker container (`Dockerfile` + Compose `backend` service on :8080, `docker` Spring profile, healthy-dependency on PostgreSQL and OCR, runs the JobRunr background server). **JobRunr persists jobs in PostgreSQL** (Spring Boot auto-configuration), not Redis — Redis ships in Compose but is currently unused by business logic and reserved for future caching/rate-limiting. Storage is `STORAGE_TYPE=local` (local filesystem) for development; the S3 abstraction is implemented and code-reviewed, but live S3 integration testing remains part of M7 and is not yet verified.
 
 ## Invoice Lifecycle
 
@@ -116,7 +116,9 @@ python-ocr/      FastAPI app, Dockerfile (installs tesseract-ocr), pytest suite
 Prerequisites: Java 21, Maven wrapper included, Docker + Compose, Python 3.11 (only for running the OCR service/tests locally).
 
 ```bash
-docker-compose up -d            # PostgreSQL :5432, Redis :6379, OCR :8000
+docker compose up -d --build                    # full stack: postgres :5432, redis :6379, python-ocr :8000, backend :8080
+docker compose up -d postgres redis python-ocr  # infrastructure + OCR only (local backend dev)
+docker compose up -d --build backend            # backend container only (needs healthy postgres + python-ocr)
 ./mvnw.cmd clean verify         # full Java suite (needs Docker for PG/OCR tests)
 cd python-ocr && python -m pytest   # Python suite (needs tesseract binary for 1 test)
 ./mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=local   # API on :8080
@@ -129,9 +131,13 @@ There is no self-registration endpoint; seed users directly in the database (see
 ```bash
 JWT_SECRET_KEY=<your-base64-hs256-secret>   # required, no default
 AI_SERVICE_TOKEN=<shared-java-python-token> # must match on both sides
-APP_OCR_SERVICE_URL=http://localhost:8000   # Java → Python
-APP_STORAGE_LOCAL_DIR=./data/storage
-POSTGRES_USER / POSTGRES_PASSWORD           # Compose / docker profile
+AI_SERVICE_URL=http://python-ocr:8000       # docker profile (backend → OCR); code default http://localhost:8000 for local runs
+OCR_CONNECT_TIMEOUT=5                       # docker profile (seconds)
+OCR_READ_TIMEOUT=120                        # docker profile (seconds)
+STORAGE_TYPE=local                           # local | s3 (S3 abstraction exists; live S3 verification is M7)
+STORAGE_LOCAL_DIR=./data/storage            # host path; container default /app/data/storage under docker profile
+S3_BUCKET / S3_REGION / S3_ACCESS_KEY / S3_SECRET_KEY / S3_ENDPOINT  # only used when STORAGE_TYPE=s3
+POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB  # Compose / docker profile (POSTGRES_URL is composed as jdbc:postgresql://postgres:5432/<db>)
 ```
 
 Test-only values live under `src/test/resources` and never authenticate production. Never commit real secrets — see `docs/GITHUB_SETUP.md`.
@@ -147,7 +153,7 @@ Test-only values live under `src/test/resources` and never authenticate producti
 
 ## Testing
 
-Verified evidence: **48 Java tests, 0 failures, 0 errors, 0 skipped** (`clean verify`, Docker available) + **6 Python tests green**. Coverage includes auth/RBAC, tenant isolation incl. spoofed headers, duplicate/idempotency matrices, latch-raced concurrency (invoice + approval), optimistic locking, traversal/validation, containerized real-OCR end-to-end, and Flyway-on-Postgres validation. M5 workflow tests require Docker; without it they skip rather than fail.
+Verified evidence: **48 Java tests, 0 failures, 0 errors, 0 skipped** (`clean verify`, Docker available) + **6 Python tests green**. Coverage includes auth/RBAC, tenant isolation incl. spoofed headers, duplicate/idempotency matrices, latch-raced concurrency (invoice + approval), optimistic locking, traversal/validation, containerized real-OCR end-to-end, and Flyway-on-Postgres validation. Docker-dependent tests require Docker — M6.1 removed `@Testcontainers(disabledWithoutDocker = true)`, so they no longer silently skip when Docker is unavailable.
 
 ## Engineering Decisions
 
@@ -155,7 +161,8 @@ See `docs/ARCHITECTURE.md`, `docs/ENGINEERING_DECISIONS.md`, `docs/API.md`, `doc
 
 ## Known Limitations
 
-- Local filesystem storage (no S3/MinIO yet); no backend container image.
+- Local filesystem storage for development (`STORAGE_TYPE=local`); S3 storage is implemented and deployment-ready, but live S3 integration testing remains part of M7 (not yet verified). No MinIO service in the current Compose stack.
+- Backend runs as a Docker container (`Dockerfile` + Compose `backend` service) as well as via `spring-boot:run`.
 - Notifications are persisted records with sync-after-commit simulated delivery — no SMTP/Slack dispatch.
 - OCR extracts header fields and totals (regex heuristics + fixed confidence weights), not line items; no ML training.
 - Single-instance JobRunr against Postgres; Redis reserved, not wired.
@@ -164,4 +171,4 @@ See `docs/ARCHITECTURE.md`, `docs/ENGINEERING_DECISIONS.md`, `docs/API.md`, `doc
 
 ## Future Improvements
 
-S3/MinIO storage, real notification dispatch, line-item extraction, composite tenant FKs, rate limiting, backend image + CI pipeline, approval SLA/escalation. All explicitly out of V1.0 scope.
+Live S3 integration verification, real notification dispatch, line-item extraction, composite tenant FKs, rate limiting, CI pipeline, approval SLA/escalation. All explicitly out of V1.0 scope. Cloud deployment has not happened yet; see `docs/DEPLOYMENT.md` for the planned M7 target (Railway + AWS S3).

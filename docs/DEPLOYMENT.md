@@ -75,7 +75,11 @@ curl http://localhost:8080/actuator/health
 ```
 
 All four services (postgres, redis, python-ocr, backend) start with health checks.
-The backend waits for postgres, redis, and python-ocr to be healthy before starting.
+The backend builds from `Dockerfile`, listens on 8080, uses the `docker` Spring profile,
+runs the JobRunr background server (PostgreSQL-backed), and waits for postgres, redis,
+and python-ocr to be healthy before starting. (Redis is a health dependency in Compose
+but is currently unused by application business logic.) The OCR service listens on 8000,
+is called internally by the backend, and uses Tesseract.
 
 ---
 
@@ -96,7 +100,10 @@ export JWT_SECRET_KEY=$(openssl rand -base64 32)
 # 3. Run Spring Boot
 ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
 
-# 4. Run tests
+# 4. Or start the backend as a container instead of a local process
+docker compose up -d --build backend
+
+# 5. Run tests
 ./mvnw test -Dspring.profiles.active=test
 ```
 
@@ -136,18 +143,18 @@ All configuration is driven by environment variables. See `.env.example` for the
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AI_SERVICE_URL` | `http://python-ocr:8000` | OCR service base URL |
-| `OCR_CONNECT_TIMEOUT` | `5` | Connection timeout (seconds) |
-| `OCR_READ_TIMEOUT` | `120` | Read timeout (seconds) |
+| `AI_SERVICE_URL` | `http://python-ocr:8000` | OCR service base URL (docker profile; code default `http://localhost:8000` for local runs) |
+| `OCR_CONNECT_TIMEOUT` | `5` | Connection timeout (seconds, docker profile) |
+| `OCR_READ_TIMEOUT` | `120` | Read timeout (seconds, docker profile) |
 
 ### Storage
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `STORAGE_TYPE` | `local` | `local` or `s3` |
-| `STORAGE_LOCAL_DIR` | `./data/storage` | Local filesystem path |
-| `S3_BUCKET` | — | S3 bucket name |
-| `S3_ENDPOINT` | — | S3 endpoint URL (for MinIO/compatible) |
+| `STORAGE_LOCAL_DIR` | `./data/storage` (host; `/app/data/storage` in-container default under the `docker` profile) | Local filesystem path (used when `STORAGE_TYPE=local`) |
+| `S3_BUCKET` | — | S3 bucket name (used when `STORAGE_TYPE=s3`) |
+| `S3_ENDPOINT` | — | S3-compatible endpoint override; leave empty for AWS S3 |
 | `S3_REGION` | `us-east-1` | AWS region |
 | `S3_ACCESS_KEY` | — | AWS access key |
 | `S3_SECRET_KEY` | — | AWS secret key |
@@ -156,13 +163,15 @@ All configuration is driven by environment variables. See `.env.example` for the
 
 ## Storage Configuration
 
-### Local Filesystem (Default)
+### Local Filesystem (Development default)
 
-No additional configuration needed. Files are stored in `./data/storage` (or the configured `STORAGE_LOCAL_DIR`).
+Set `STORAGE_TYPE=local`. No additional configuration needed. Files are stored in
+`./data/storage` on the host (or the configured `STORAGE_LOCAL_DIR`; the `docker`
+profile defaults to `/app/data/storage` inside the backend container).
 
 **Limitation:** Not suitable for multi-instance deployments or horizontal scaling. Files are stored on the local disk of whichever host runs the container.
 
-### S3 / S3-Compatible (Production)
+### S3 (Production target)
 
 Set `STORAGE_TYPE=s3` and configure the S3 variables:
 
@@ -174,17 +183,37 @@ S3_ACCESS_KEY=AKIA...
 S3_SECRET_KEY=...
 ```
 
-For **MinIO** or other S3-compatible storage:
-
-```env
-S3_ENDPOINT=http://minio:9000
-```
+S3 storage is implemented and deployment-ready, but live S3 integration testing
+remains part of M7 and has not yet been verified. There is no MinIO service in the
+current `docker-compose.yml`; the production target is AWS S3.
 
 ---
 
 ## Production Deployment
 
-### Pre-deployment Checklist
+### Current Status (M6.1 — NOT yet cloud deployed)
+
+- GitHub repository is ready
+- Dockerized backend exists (`Dockerfile` + Compose `backend` service)
+- OCR container works (FastAPI + Tesseract on :8000)
+- PostgreSQL integration works (Flyway V1–V6)
+- S3 storage abstraction exists (code-reviewed, not yet live verified)
+- Cloud deployment has NOT happened yet; there is no frontend and no production URL
+
+### Planned M7 Deployment Target (PLANNED / NOT YET DEPLOYED)
+
+- Railway: backend as a Docker service
+- Railway: managed PostgreSQL
+- Railway: OCR as a private service (backend reaches it over the private network)
+- AWS S3 for durable document storage (`STORAGE_TYPE=s3`)
+- HTTPS and production secrets via the platform's secret management
+
+Railway is the planned application deployment platform. No Railway-specific
+variables beyond what the application already consumes (`JWT_SECRET_KEY`,
+`AI_SERVICE_TOKEN`, `POSTGRES_*`, `AI_SERVICE_URL`, `OCR_*`, `STORAGE_*`, `S3_*`)
+are documented here.
+
+### Pre-deployment Checklist (for the M7 deployment)
 
 - [ ] Set a strong, random `JWT_SECRET_KEY` (≥256 bits)
 - [ ] Set a strong, random `AI_SERVICE_TOKEN`
@@ -253,7 +282,7 @@ cat backup.sql | docker exec -i invoiceiq-postgres psql -U invoiceiq invoiceiq_d
 | `GET /actuator/health` | Spring Boot health (UP/DOWN) |
 | `GET /actuator/info` | Application info |
 | `GET /actuator/metrics` | Metrics (JVM, HTTP, DB pool) |
-| `GET http://ocr:8000/health` | Python OCR health |
+| `GET /health` on the OCR service | Python OCR health — from the host: `curl http://localhost:8000/health`; from inside the backend container: `http://python-ocr:8000/health` |
 
 Docker Compose health checks are configured for all services with automatic restarts.
 
