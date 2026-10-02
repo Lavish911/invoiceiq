@@ -192,24 +192,24 @@ current `docker-compose.yml`; the production target is AWS S3.
 
 ## Production Deployment
 
-### Current Status (M6.1 — NOT yet cloud deployed)
+### Current Status (M7.3 — LIVE on Railway + AWS S3)
 
 - GitHub repository is ready
 - Dockerized backend exists (`Dockerfile` + Compose `backend` service)
 - OCR container works (FastAPI + Tesseract on :8000)
 - PostgreSQL integration works (Flyway V1–V6)
-- S3 storage abstraction exists (code-reviewed, not yet live verified)
-- Cloud deployment has NOT happened yet; there is no frontend and no production URL
+- S3 storage verified live through the application (upload → extraction → readback, durable across backend restart)
+- Cloud deployment is LIVE: Railway backend (public HTTPS) + Railway PostgreSQL + private Railway OCR + AWS S3; no frontend
 
-### Planned M7 Deployment Target (PLANNED / NOT YET DEPLOYED)
+### M7 Deployment As Built (DEPLOYED AND VERIFIED)
 
-- Railway: backend as a Docker service
-- Railway: managed PostgreSQL
-- Railway: OCR as a private service (backend reaches it over the private network)
-- AWS S3 for durable document storage (`STORAGE_TYPE=s3`)
-- HTTPS and production secrets via the platform's secret management
+- Railway: backend as a Docker service (`backend`, public HTTPS, health `GET /actuator/health` → `UP`)
+- Railway: managed PostgreSQL (private `postgres.railway.internal:5432`; fresh database migrated V1–V6 by Flyway plus JobRunr tables)
+- Railway: OCR as a private service (`ocr`, no public domain; backend reaches it at `http://ocr.railway.internal:8000` with explicit `AI_SERVICE_TOKEN`, `OCR_REQUIRE_EXPLICIT_TOKEN=true`)
+- AWS S3 for durable document storage (`STORAGE_TYPE=s3`, private bucket, SSE, anonymous access denied)
+- HTTPS via the Railway-provided service domain; production secrets via Railway service variables (never committed)
 
-Railway is the planned application deployment platform. No Railway-specific
+Railway is the application deployment platform. No Railway-specific
 variables beyond what the application already consumes (`JWT_SECRET_KEY`,
 `AI_SERVICE_TOKEN`, `POSTGRES_*`, `AI_SERVICE_URL`, `OCR_*`, `STORAGE_*`, `S3_*`)
 are documented here.

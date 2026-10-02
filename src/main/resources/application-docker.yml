@@ -24,6 +24,15 @@ spring:
       host: ${REDIS_HOST:redis}
       port: ${REDIS_PORT:6379}
 
+# Redis is not used by application business logic (JobRunr persists via
+# PostgreSQL), and production has no Redis service. Its auto-configured
+# actuator health indicator would otherwise report DOWN and fail the
+# platform health check, so it is explicitly disabled in this profile.
+management:
+  health:
+    redis:
+      enabled: false
+
 app:
   ocr:
     service:

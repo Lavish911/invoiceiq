@@ -171,4 +171,4 @@ See `docs/ARCHITECTURE.md`, `docs/ENGINEERING_DECISIONS.md`, `docs/API.md`, `doc
 
 ## Future Improvements
 
-Live S3 integration verification, real notification dispatch, line-item extraction, composite tenant FKs, rate limiting, CI pipeline, approval SLA/escalation. All explicitly out of V1.0 scope. Cloud deployment has not happened yet; see `docs/DEPLOYMENT.md` for the planned M7 target (Railway + AWS S3).
+Real notification dispatch, line-item extraction, composite tenant FKs, rate limiting, CI pipeline, approval SLA/escalation. All explicitly out of V1.0 scope. M7 cloud deployment is live on Railway + AWS S3 (verified end-to-end incl. restart durability); see `docs/DEPLOYMENT.md` for the as-built topology and verification evidence.
