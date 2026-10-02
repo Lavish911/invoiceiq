@@ -3,7 +3,7 @@ import importlib
 import pytest
 from fastapi.testclient import TestClient
 import main
-from main import app, AI_SERVICE_TOKEN
+from main import app, AI_SERVICE_TOKEN, extract_from_text
 import io
 from PIL import Image, ImageDraw, ImageFont
 
@@ -123,3 +123,72 @@ def test_strict_mode_accepts_explicit_token(monkeypatch):
 def test_non_strict_mode_keeps_dev_default_for_local_runs(monkeypatch):
     token, _ = _boot_main_with_env(monkeypatch, None, "false")
     assert token == "default_dev_token"
+
+# M8.1 total_amount regression matrix: pure-function tests on
+# extract_from_text (no Tesseract/HTTP). "total" must never match inside
+# subtotal variants, while legitimate total labels keep working.
+
+def _extract_total(text):
+    data, _ = extract_from_text(text)
+    return data.total_amount, data.subtotal
+
+def test_total_subtotal_yields_no_total():
+    total, sub = _extract_total("Subtotal: 1000.00")
+    assert total is None
+    assert sub == "1000.00"
+
+def test_total_uppercase_subtotal_yields_no_total():
+    total, _ = _extract_total("SUBTOTAL: 1000.00")
+    assert total is None
+
+def test_total_hyphenated_subtotal_yields_no_total():
+    total, _ = _extract_total("Sub-total: 1000.00")
+    assert total is None
+
+def test_total_spaced_subtotal_yields_no_total():
+    total, _ = _extract_total("Sub Total: 1000.00")
+    assert total is None
+
+def test_total_mixed_case_subtotal_yields_no_total():
+    total, _ = _extract_total("SubTOTAL: 1000.00")
+    assert total is None
+
+def test_total_plain_label():
+    total, _ = _extract_total("Total: 1234.56")
+    assert total == "1234.56"
+
+def test_total_grand_total_label():
+    total, _ = _extract_total("Grand Total: 99.99")
+    assert total == "99.99"
+
+def test_total_invoice_total_label():
+    total, _ = _extract_total("Invoice Total: 42.00")
+    assert total == "42.00"
+
+def test_total_amount_due_label():
+    total, _ = _extract_total("Amount Due: 7.50")
+    assert total == "7.50"
+
+def test_total_subtotal_before_total_resolves_actual_total():
+    text = "Subtotal: 1100.00\nTax: 134.56\nTotal: 1234.56"
+    total, sub = _extract_total(text)
+    assert total == "1234.56"
+    assert sub == "1100.00"
+
+def test_total_currency_and_thousands_separator():
+    total, _ = _extract_total("Total: $1,234.56")
+    assert total == "1234.56"
+
+def test_total_m73_failing_pattern():
+    # Exact shape of the M7.3 cloud failure: subtotal line above the total.
+    text = ("M7.3 Test Vendor\nInvoice Number: M73-REAL-002\nDate: 2026-10-01\n"
+            "Subtotal: 1100.00\nTax: 134.56\nTotal: 1234.56")
+    total, sub = _extract_total(text)
+    assert total == "1234.56"
+    assert sub == "1100.00"
+
+def test_total_amount_label_preserves_current_behavior():
+    # "Total Amount:" is not a supported label today (fail-safe null);
+    # pinned so any future support is a deliberate change.
+    total, _ = _extract_total("Total Amount: 5.00")
+    assert total is None

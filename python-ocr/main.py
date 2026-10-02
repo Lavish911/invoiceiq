@@ -117,7 +117,14 @@ def extract_from_text(text: str) -> (ExtractionData, ConfidenceScores):
         conf.tax_amount = 0.9
 
     # Find Total
-    total_match = re.search(r'(?i)(?:total|amount due)\s*[:\-]?\s*[\$€£]?\s*([\d,]+\.\d{2})', text)
+    # Guard: "total" must not match inside subtotal variants ("Subtotal",
+    # "Sub-total", "Sub Total", incl. case variations and any whitespace
+    # split Tesseract may emit). Normalize those variants to "subtotal" first
+    # (this copy is used for the total search only), then reject any "total"
+    # immediately preceded by "sub".
+    total_text = re.sub(r'(?i)sub\s*-\s*total', 'subtotal', text)
+    total_text = re.sub(r'(?i)sub\s+total', 'subtotal', total_text)
+    total_match = re.search(r'(?i)(?:(?<!sub)total|amount due)\s*[:\-]?\s*[\$€£]?\s*([\d,]+\.\d{2})', total_text)
     if total_match:
         data.total_amount = parse_money(total_match.group(1))
         conf.total_amount = 0.95
