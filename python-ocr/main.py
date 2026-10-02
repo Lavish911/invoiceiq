@@ -13,6 +13,23 @@ app = FastAPI(title="InvoiceIQ OCR Service")
 
 AI_SERVICE_TOKEN = os.getenv("AI_SERVICE_TOKEN", "default_dev_token")
 
+# Fail-fast production guard (mirrors the backend docker-profile validator):
+# when OCR_REQUIRE_EXPLICIT_TOKEN is enabled (Docker Compose / Railway), booting
+# with a missing or publicly known development token is refused instead of
+# silently accepted. Plain local runs (uvicorn without the flag) keep the
+# development default for convenience.
+DEV_DEFAULT_TOKENS = frozenset({"", "default_dev_token", "dev-local-token-change-me"})
+OCR_REQUIRE_EXPLICIT_TOKEN = (
+    os.getenv("OCR_REQUIRE_EXPLICIT_TOKEN", "").strip().lower() in ("1", "true", "yes")
+)
+
+if OCR_REQUIRE_EXPLICIT_TOKEN and AI_SERVICE_TOKEN.strip() in DEV_DEFAULT_TOKENS:
+    raise RuntimeError(
+        "AI_SERVICE_TOKEN must be set to an explicit non-default value when "
+        "OCR_REQUIRE_EXPLICIT_TOKEN is enabled; refusing to boot with a "
+        "missing or publicly known development token."
+    )
+
 class ExtractionData(BaseModel):
     invoice_number: Optional[str]
     invoice_date: Optional[str]

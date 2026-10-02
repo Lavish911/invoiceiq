@@ -19,7 +19,7 @@ graph TD
     FastAPI -->|pytesseract| Tesseract[Tesseract OCR]
 ```
 
-Redis ships in `docker-compose.yml` but **no application code uses it**; JobRunr persists jobs in **PostgreSQL** via Spring Boot auto-configuration. There is no Java container image — Compose runs Postgres, Redis, and the OCR service only.
+Both services are containerized (backend `Dockerfile`, OCR `python-ocr/Dockerfile`); Compose runs PostgreSQL, Redis, the OCR service, and the Spring Boot backend. Redis ships in Compose but **no application code uses it**; JobRunr persists jobs in **PostgreSQL** via Spring Boot auto-configuration. Storage defaults to the local filesystem (`STORAGE_TYPE=local`); the S3 abstraction is implemented but live S3 verification is pending (M7). Railway/AWS deployment is planned, not completed.
 
 ## Component Responsibilities
 

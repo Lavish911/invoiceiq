@@ -63,7 +63,8 @@ cd invoiceiq
 
 # 2. Create environment file
 cp .env.example .env
-# Edit .env — at minimum set JWT_SECRET_KEY:
+# Edit .env — at minimum set JWT_SECRET_KEY and change AI_SERVICE_TOKEN
+# from its placeholder (docker/production startup refuses the default):
 #   openssl rand -base64 32
 
 # 3. Start all services

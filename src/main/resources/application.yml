@@ -5,7 +5,8 @@ spring:
     active: local
 
 server:
-  port: 8080
+  # Railway injects PORT; default 8080 keeps local and Docker behavior unchanged.
+  port: ${PORT:8080}
 
 management:
   endpoints:

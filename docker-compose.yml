@@ -37,6 +37,9 @@ services:
     restart: always
     environment:
       - AI_SERVICE_TOKEN=${AI_SERVICE_TOKEN:-default_dev_token}
+      # Fail fast if the OCR credential is missing or a known development
+      # default (overridable to "false" for throwaway local experiments only).
+      - OCR_REQUIRE_EXPLICIT_TOKEN=${OCR_REQUIRE_EXPLICIT_TOKEN:-true}
     ports:
       - "8000:8000"
     healthcheck:

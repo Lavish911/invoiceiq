@@ -11,6 +11,12 @@ spring:
     properties:
       hibernate:
         format_sql: true
+  servlet:
+    multipart:
+      # Must match the application-level 10 MB upload contract enforced in
+      # DocumentService; without this the framework defaults apply first.
+      max-file-size: 10MB
+      max-request-size: 10MB
   flyway:
     enabled: true
     url: jdbc:postgresql://localhost:5432/invoiceiq_db
