@@ -24,15 +24,3 @@ export const clearTokens = () => {
 };
 
 export const isAuthenticated = () => !!getAccessToken();
-
-export const getUserRoles = (): string[] => {
-  const token = getAccessToken();
-  if (!token) return [];
-  try {
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    // Spring security usually puts roles in a 'roles' or 'authorities' array, or comma-separated
-    return payload.roles || payload.authorities || [];
-  } catch {
-    return [];
-  }
-};

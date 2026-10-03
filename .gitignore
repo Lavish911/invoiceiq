@@ -46,3 +46,14 @@ Thumbs.db
 
 # Docker volumes are managed by Docker, not git
 # (named volumes contain local Postgres/Redis data)
+
+# Temporary test/build artifacts
+env.json
+test_invoice.pdf
+test_invoice.txt
+
+# Frontend build artifacts
+frontend/playwright-report/
+frontend/test-results/
+frontend/.next/
+frontend/node_modules/

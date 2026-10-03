@@ -34,9 +34,9 @@ export function ApprovalWorkflow({ invoiceId }: ApprovalWorkflowProps) {
   const [actionError, setActionError] = useState<string | null>(null);
 
 
-  // 404 means no workflow started yet
+  // 404 or 400 means no workflow started yet (backend returns 400 when no workflow exists)
   if (isError) {
-    if (isAxiosError(error) && error.response?.status === 404) {
+    if (isAxiosError(error) && (error.response?.status === 404 || error.response?.status === 400)) {
       return (
         <div className="rounded-lg bg-gray-50 border border-gray-200 p-6 text-center">
           <ShieldCheck className="mx-auto h-8 w-8 text-gray-400" aria-hidden="true" />
