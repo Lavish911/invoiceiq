@@ -136,6 +136,39 @@ describe('upload wire encoding (M8.2 boundary regression)', () => {
   });
 });
 
+describe('upload-new invoice (M10)', () => {
+  it('posts multipart to /api/invoices/upload-new and returns invoice identity', async () => {
+    setup();
+    setTokens('tok', 'ref');
+    let contentType: unknown = 'unset-marker';
+    let sentData: unknown;
+    let seenUrl = '';
+    mockApi.onPost('/api/invoices/upload-new').reply((config) => {
+      contentType = config.headers?.['Content-Type'];
+      sentData = config.data;
+      seenUrl = config.url ?? '';
+      return [202, { invoiceId: IID, documentId: DID, status: 'UPLOADED' }];
+    });
+
+    const file = new File(['%PDF-1.4 fake'], 't.pdf', { type: 'application/pdf' });
+    const res = await documentApi.uploadNewInvoice(file);
+
+    expect(seenUrl).toBe('/invoices/upload-new');
+    expect(contentType).not.toBe('application/json');
+    expect(sentData).toBeInstanceOf(FormData);
+    expect(res).toEqual({ invoiceId: IID, documentId: DID, status: 'UPLOADED' });
+  });
+
+  it('surfaces server validation failures', async () => {
+    setup();
+    mockApi.onPost('/api/invoices/upload-new').reply(400, { message: 'File is empty' });
+    const file = new File([], 't.pdf', { type: 'application/pdf' });
+    await expect(documentApi.uploadNewInvoice(file)).rejects.toMatchObject({
+      response: { status: 400 },
+    });
+  });
+});
+
 describe('invoice contract', () => {
   it('lists with pagination params and returns the page', async () => {
     setup();

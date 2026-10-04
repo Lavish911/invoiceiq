@@ -25,6 +25,12 @@ application:
       refresh-token:
         expiration: 604800000 # 7 days
 
+app:
+  upload-new:
+    # "+ Upload New Invoice" entry point. DEFAULT FALSE for the first
+    # deployment; enable explicitly once verified.
+    enabled: ${UPLOAD_NEW_ENABLED:false}
+
 # NOTE: JobRunr honors only the "org.jobrunr.*" prefix. A "jobrunr.*" entry
 # binds to nothing, so JobRunr behavior is configured per runtime profile
 # (application-local.yml / application-docker.yml), not here.

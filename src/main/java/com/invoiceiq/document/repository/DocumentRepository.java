@@ -11,6 +11,8 @@ import java.util.UUID;
 public interface DocumentRepository extends JpaRepository<Document, UUID> {
     Optional<Document> findByIdAndTenantId(UUID id, UUID tenantId);
 
+    Optional<Document> findFirstByInvoiceIdAndTenantIdOrderByCreatedAtDesc(UUID invoiceId, UUID tenantId);
+
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.transaction.annotation.Transactional
     @org.springframework.data.jpa.repository.Query("UPDATE Document d SET d.status = :newStatus WHERE d.id = :id AND d.tenantId = :tenantId AND (d.status = 'UPLOADED' OR d.status = 'EXTRACTION_FAILED' OR (d.status = 'PROCESSING' AND d.updatedAt < :staleThreshold))")

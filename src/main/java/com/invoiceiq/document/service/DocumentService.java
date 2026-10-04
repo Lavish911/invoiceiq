@@ -37,27 +37,8 @@ public class DocumentService {
             throw new IllegalStateException("Can only upload documents to DRAFT or REJECTED invoices");
         }
 
+        String sanitizedFilename = validateAndSanitizeFilename(file);
         try {
-            // Validate file
-            if (file.isEmpty()) {
-                throw new IllegalArgumentException("File is empty");
-            }
-            if (file.getSize() > 10 * 1024 * 1024) { // 10MB
-                throw new IllegalArgumentException("File size exceeds limit");
-            }
-            String originalFilename = file.getOriginalFilename();
-            if (originalFilename != null) {
-                String lowerName = originalFilename.toLowerCase();
-                if (!lowerName.endsWith(".pdf") && !lowerName.endsWith(".png") && !lowerName.endsWith(".jpg") && !lowerName.endsWith(".jpeg")) {
-                    throw new IllegalArgumentException("Unsupported file type");
-                }
-            } else {
-                throw new IllegalArgumentException("Filename is missing");
-            }
-
-            // Sanitize filename
-            String sanitizedFilename = java.nio.file.Paths.get(originalFilename).getFileName().toString();
-
             // Generate checksum
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
             byte[] hash = digest.digest(file.getBytes());
@@ -110,6 +91,30 @@ public class DocumentService {
         } catch (java.security.NoSuchAlgorithmException e) {
             throw new RuntimeException("Failed to upload document", e);
         }
+    }
+
+    /**
+     * Shared upload validation + basename sanitization. Extracted so the
+     * upload-new flow enforces byte-identical rules without duplicating them.
+     * Returns the sanitized basename.
+     */
+    static String validateAndSanitizeFilename(MultipartFile file) {
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("File is empty");
+        }
+        if (file.getSize() > 10 * 1024 * 1024) { // 10MB
+            throw new IllegalArgumentException("File size exceeds limit");
+        }
+        String originalFilename = file.getOriginalFilename();
+        if (originalFilename != null) {
+            String lowerName = originalFilename.toLowerCase();
+            if (!lowerName.endsWith(".pdf") && !lowerName.endsWith(".png") && !lowerName.endsWith(".jpg") && !lowerName.endsWith(".jpeg")) {
+                throw new IllegalArgumentException("Unsupported file type");
+            }
+        } else {
+            throw new IllegalArgumentException("Filename is missing");
+        }
+        return java.nio.file.Paths.get(originalFilename).getFileName().toString();
     }
 
     @Transactional(readOnly = true)

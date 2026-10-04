@@ -4,11 +4,13 @@ import com.invoiceiq.common.entity.BaseTenantEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.Getter;
 import lombok.Setter;
 
 @Entity
-@Table(name = "vendor")
+@Table(name = "vendor", uniqueConstraints = @UniqueConstraint(name = "uk_vendor_tenant_name", columnNames = {
+        "tenant_id", "name" }))
 @Getter
 @Setter
 public class Vendor extends BaseTenantEntity {

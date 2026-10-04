@@ -3,17 +3,10 @@
 import { useState, useRef, useCallback } from 'react';
 import { UploadCloud, File, AlertCircle, CheckCircle2, Loader2, FileText, ChevronDown, ChevronUp } from 'lucide-react';
 import { useUploadDocument, useDocumentExtraction } from '@/hooks/use-document';
-import { cn } from '@/lib/utils';
+import { cn, ALLOWED_UPLOAD_EXTENSIONS, validateUploadFile } from '@/lib/utils';
 import { isAxiosError } from 'axios';
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ALLOWED_TYPES = [
-  'application/pdf',
-  'image/png',
-  'image/jpeg',
-  'image/jpg'
-];
-const ALLOWED_EXTENSIONS = '.pdf,.png,.jpg,.jpeg';
+const ALLOWED_EXTENSIONS = ALLOWED_UPLOAD_EXTENSIONS;
 
 function getUploadErrorMessage(err: unknown): string {
   if (isAxiosError(err)) {
@@ -45,13 +38,7 @@ export function DocumentUploader({ invoiceId }: DocumentUploaderProps) {
   const extractionQuery = useDocumentExtraction(invoiceId, documentId);
 
   const validateFile = useCallback((file: File): string | null => {
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      return 'Invalid file type. Only PDF, PNG, and JPG/JPEG are supported.';
-    }
-    if (file.size > MAX_FILE_SIZE) {
-      return 'File is too large. Maximum size is 10 MB.';
-    }
-    return null;
+    return validateUploadFile(file);
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {

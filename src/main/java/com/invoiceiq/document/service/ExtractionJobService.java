@@ -10,6 +10,9 @@ import com.invoiceiq.document.repository.ExtractionResultRepository;
 import com.invoiceiq.invoice.entity.Invoice;
 import com.invoiceiq.invoice.entity.InvoiceStatus;
 import com.invoiceiq.invoice.repository.InvoiceRepository;
+import com.invoiceiq.vendor.entity.Vendor;
+import com.invoiceiq.vendor.repository.VendorRepository;
+import com.invoiceiq.vendor.service.VendorService;
 import lombok.RequiredArgsConstructor;
 import org.jobrunr.jobs.annotations.Job;
 import org.springframework.stereotype.Service;
@@ -27,6 +30,8 @@ public class ExtractionJobService {
     private final InvoiceRepository invoiceRepository;
     private final DocumentStorageService documentStorageService;
     private final PythonExtractionClient pythonExtractionClient;
+    private final VendorRepository vendorRepository;
+    private final com.invoiceiq.audit.service.AuditLogService auditLogService;
     @org.springframework.beans.factory.annotation.Autowired @org.springframework.context.annotation.Lazy
     private ExtractionJobService self;
 
@@ -132,6 +137,7 @@ public class ExtractionJobService {
 
             // Populate invoice with basic extracted data
             if (response.getExtractedData() != null) {
+                matchExtractedVendor(tenantId, invoice, response.getExtractedData().get("vendor_name"));
                 if (response.getExtractedData().containsKey("invoice_number")) {
                     String extractedNumber = (String) response.getExtractedData().get("invoice_number");
                     boolean collision = invoiceRepository.existsByTenantVendorAndNumber(tenantId, invoice.getVendor() != null ? invoice.getVendor().getId() : null, extractedNumber);
@@ -171,5 +177,45 @@ public class ExtractionJobService {
         extractionResultRepository.save(result);
         documentRepository.save(document);
         invoiceRepository.save(invoice);
+    }
+
+    /**
+     * Exact case-insensitive vendor matching only (never fuzzy, never OCR
+     * heuristic changes). Reassigns the invoice vendor when the extracted
+     * name matches a real tenant vendor; the per-tenant placeholder is always
+     * excluded and a non-match keeps the current vendor. Runs inside the
+     * REQUIRES_NEW save transaction, so the existing @Version check still
+     * guards concurrent modifications.
+     */
+    private void matchExtractedVendor(UUID tenantId, Invoice invoice, Object vendorName) {
+        if (!(vendorName instanceof String name) || name.isBlank()) {
+            return;
+        }
+        String candidate = name.strip();
+        UUID placeholderId = vendorRepository
+                .findByTenantIdAndName(tenantId, VendorService.UNASSIGNED_VENDOR_NAME)
+                .map(Vendor::getId)
+                .orElse(null);
+        Vendor matched = null;
+        for (Vendor vendor : vendorRepository.findByTenantIdOrderByName(tenantId)) {
+            if (placeholderId != null && vendor.getId().equals(placeholderId)) {
+                continue;
+            }
+            if (vendor.getName().equalsIgnoreCase(candidate)) {
+                matched = vendor;
+                break;
+            }
+        }
+        if (matched == null) {
+            return;
+        }
+        UUID currentVendorId = invoice.getVendor() != null ? invoice.getVendor().getId() : null;
+        if (matched.getId().equals(currentVendorId)) {
+            return;
+        }
+        String oldName = invoice.getVendor() != null ? invoice.getVendor().getName() : null;
+        invoice.setVendor(matched);
+        auditLogService.recordEvent("INVOICE", invoice.getId(), "VENDOR_REASSIGNED",
+                oldName, matched.getName(), "Matched extracted vendor name", tenantId);
     }
 }

@@ -108,6 +108,7 @@ function formatDate(dateStr: string) {
 
 import Link from 'next/link';
 import { DemoBanner } from '@/components/demo/DemoBanner';
+import { UploadNewInvoiceButton } from '@/components/invoice/upload-new-invoice-button';
 
 export function Dashboard() {
   const { data, isLoading, isError, error } = useInvoices({ page: 0, size: 100, sort: 'createdAt,desc' });
@@ -138,8 +139,11 @@ export function Dashboard() {
   return (
     <div className="space-y-8">
       <DemoBanner />
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-900">Overview</h2>
+        <UploadNewInvoiceButton />
+      </div>
       <div>
-        <h2 className="mb-4 text-lg font-semibold text-gray-900">Overview</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
           <StatusCard label="Total Invoices" count={totalElements} icon={FileText} color="bg-indigo-100 text-indigo-600" />
           <StatusCard label="Draft" count={counts.DRAFT} icon={STATUS_CONFIG.DRAFT.icon} color="bg-gray-100 text-gray-600" />

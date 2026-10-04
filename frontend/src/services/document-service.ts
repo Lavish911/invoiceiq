@@ -1,6 +1,12 @@
 import { apiClient } from '@/lib/api-client';
 import { UploadDocumentResponse, DocumentResponse, ExtractionResult } from '@/types/invoice';
 
+export interface UploadNewInvoiceResponse {
+  invoiceId: string;
+  documentId: string;
+  status: string;
+}
+
 export const documentApi = {
   uploadDocument: async (invoiceId: string, file: File): Promise<UploadDocumentResponse> => {
     const formData = new FormData();
@@ -24,5 +30,20 @@ export const documentApi = {
 
   getExtractionResult: async (invoiceId: string, documentId: string): Promise<ExtractionResult> => {
     return apiClient.get(`/invoices/${invoiceId}/documents/${documentId}/extraction`);
+  },
+
+  /**
+   * "+ Upload New Invoice": creates a DRAFT invoice from a bare file upload.
+   * Same multipart rules as uploadDocument (browser-generated boundary).
+   */
+  uploadNewInvoice: async (file: File): Promise<UploadNewInvoiceResponse> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return apiClient.post('/invoices/upload-new', formData, {
+      headers: {
+        'Content-Type': undefined as unknown as string,
+      },
+    });
   },
 };
