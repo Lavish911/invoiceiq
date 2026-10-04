@@ -21,5 +21,7 @@ export default defineConfig({
     command: 'npm run dev',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
+    // Cold Turbopack compile exceeds the 60s default on first boot.
+    timeout: 180000,
   },
 });

@@ -107,6 +107,7 @@ function formatDate(dateStr: string) {
 }
 
 import Link from 'next/link';
+import { DemoBanner } from '@/components/demo/DemoBanner';
 
 export function Dashboard() {
   const { data, isLoading, isError, error } = useInvoices({ page: 0, size: 100, sort: 'createdAt,desc' });
@@ -136,6 +137,7 @@ export function Dashboard() {
 
   return (
     <div className="space-y-8">
+      <DemoBanner />
       <div>
         <h2 className="mb-4 text-lg font-semibold text-gray-900">Overview</h2>
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">

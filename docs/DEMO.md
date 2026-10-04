@@ -2,6 +2,22 @@
 
 Prerequisite: a tenant and users exist (there is no self-registration endpoint — seed them directly, e.g. via the H2 console in tests or SQL inserts). The walkthrough below uses field names verified against the DTOs; every step was cross-checked with `docs/API.md`.
 
+## Public demo workspace (recruiters: start here)
+
+Click **Try Demo** on the login page — no account needed. It signs in as the
+disposable demo submitter inside the isolated demo tenant
+(`123e4567-e89b-12d3-a456-426614174999`). Use the banner's
+**View as approver** button to switch roles without retyping credentials.
+
+- Demo data is shared and resets automatically: uploads older than
+  `app.demo.retention-hours` (default 24) are purged hourly, seed content
+  always stays. Do not put anything confidential in the demo workspace.
+- Demo uploads are quota-limited (`app.demo.max-uploads-per-hour`, default 20;
+  `app.demo.max-bytes-total`, default 200 MB); over-quota uploads get HTTP 429.
+- Demo credentials (`NEXT_PUBLIC_DEMO_*`) are intentionally public and must
+  never belong to a real user. Real tenants are unaffected: every demo query
+  is tenant-scoped and the cleanup job only touches the demo tenant.
+
 ## 0. Seed a tenant + admin user (local dev only)
 
 There is no sign-up endpoint, so insert one tenant and one user straight into PostgreSQL
@@ -108,3 +124,41 @@ GET /api/invoices/{invoiceId}/audit
 ```
 
 **Result**: newest-first events actually recorded by the system: `SUBMITTED` (DRAFT → NEEDS_REVIEW), `WORKFLOW_CREATED` (→ PENDING_APPROVAL), then `APPROVED` or `REJECTED` — each with actor, old/new state, comment, and timestamp. Cross-tenant reads return `404`.
+
+## 10. Demo tenant seed runbook (operator only)
+
+Run once per environment where the public demo is enabled, after Flyway V7.
+Generate BCrypt hashes locally for a disposable demo password (never reuse a
+real credential), then insert the tenant, users, a vendor, and a few invoices
+across states. Finally register every seeded row so cleanup preserves it:
+
+```sql
+-- tenant + users (use your own BCrypt hashes of the disposable password)
+INSERT INTO tenant (id, name) VALUES
+  ('123e4567-e89b-12d3-a456-426614174999', 'Demo Company');
+INSERT INTO users (id, tenant_id, email, password_hash, role) VALUES
+  (gen_random_uuid(), '123e4567-e89b-12d3-a456-426614174999',
+   'demo@invoiceiq.demo', '<bcrypt-of-demo-password>', 'SUBMITTER'),
+  (gen_random_uuid(), '123e4567-e89b-12d3-a456-426614174999',
+   'demo.approver@invoiceiq.demo', '<bcrypt-of-demo-password>', 'APPROVER'),
+  (gen_random_uuid(), '123e4567-e89b-12d3-a456-426614174999',
+   'demo.admin@invoiceiq.demo', '<bcrypt-of-demo-password>', 'ADMIN');
+
+-- vendor + invoices (example; keep the same tenant id everywhere)
+-- ... insert vendor/invoice/line-item rows, then upload their documents
+-- through POST /api/invoices/{id}/documents so S3 objects exist ...
+-- A demo ADMIN (demo.admin@invoiceiq.demo) owns workflow-rule setup via
+-- POST /api/workflow-rules, e.g. {"name":"Demo rule","minimumAmount":100,
+-- "requiredApprovals":1,"priority":1}; invoices at/above the threshold then
+-- route to PENDING_APPROVAL instead of auto-approving.
+
+-- register seed rows (repeat per seeded DOCUMENT and INVOICE id)
+INSERT INTO demo_seed (entity_type, entity_id, tenant_id) VALUES
+  ('INVOICE', '<seed-invoice-uuid>', '123e4567-e89b-12d3-a456-426614174999'),
+  ('DOCUMENT', '<seed-document-uuid>', '123e4567-e89b-12d3-a456-426614174999');
+```
+
+Enable the feature with `DEMO_TENANT_ID=123e4567-e89b-12d3-a456-426614174999`
+(plus optional `DEMO_MAX_UPLOADS_PER_HOUR`, `DEMO_MAX_BYTES_TOTAL`,
+`DEMO_RETENTION_HOURS`). With the variable unset, all demo behavior —
+quota gate and cleanup scheduling — stays completely disabled.

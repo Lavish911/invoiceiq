@@ -49,6 +49,13 @@ app:
       region: ${S3_REGION:us-east-1}
       access-key: ${S3_ACCESS_KEY:}
       secret-key: ${S3_SECRET_KEY:}
+  demo:
+    # Demo tenant UUID. Empty (default) disables all demo behavior, including
+    # the upload quota and the hourly cleanup job.
+    tenant-id: ${DEMO_TENANT_ID:}
+    max-uploads-per-hour: ${DEMO_MAX_UPLOADS_PER_HOUR:20}
+    max-bytes-total: ${DEMO_MAX_BYTES_TOTAL:209715200}
+    retention-hours: ${DEMO_RETENTION_HOURS:24}
 
 # JobRunr background job server: REQUIRED in every real runtime so enqueued
 # extraction jobs are actually processed. Uses PostgreSQL storage. Deliberately

@@ -64,6 +64,11 @@ services:
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - AI_SERVICE_URL=http://python-ocr:8000
       - AI_SERVICE_TOKEN=${AI_SERVICE_TOKEN:-default_dev_token}
+      # Demo workspace (all optional; unset DEMO_TENANT_ID disables demo behavior)
+      - DEMO_TENANT_ID=${DEMO_TENANT_ID:-}
+      - DEMO_MAX_UPLOADS_PER_HOUR=${DEMO_MAX_UPLOADS_PER_HOUR:-20}
+      - DEMO_MAX_BYTES_TOTAL=${DEMO_MAX_BYTES_TOTAL:-209715200}
+      - DEMO_RETENTION_HOURS=${DEMO_RETENTION_HOURS:-24}
     ports:
       - "8080:8080"
     depends_on:

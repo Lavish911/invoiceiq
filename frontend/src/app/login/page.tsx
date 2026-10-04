@@ -3,6 +3,8 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth, loginSchema, type LoginFormData } from '@/hooks/use-auth';
+import { fetchDemoConfig, submitterIdentity } from '@/lib/demo';
+import { useState } from 'react';
 import { ErrorAlert } from '@/components/ui/error-alert';
 import { Spinner } from '@/components/ui/spinner';
 import { isAxiosError } from 'axios';
@@ -22,6 +24,7 @@ function getLoginErrorMessage(error: Error): string {
 
 export default function LoginPage() {
   const { login, isLoggingIn, loginError } = useAuth();
+  const [demoError, setDemoError] = useState<string | null>(null);
 
   const {
     register,
@@ -33,6 +36,16 @@ export default function LoginPage() {
 
   const onSubmit = (data: LoginFormData) => {
     login(data);
+  };
+
+  const onTryDemo = async () => {
+    setDemoError(null);
+    try {
+      const config = await fetchDemoConfig();
+      login({ ...submitterIdentity(config) });
+    } catch {
+      setDemoError('Demo workspace is currently unavailable. Please try again later.');
+    }
   };
 
   return (
@@ -129,6 +142,25 @@ export default function LoginPage() {
             </button>
           </div>
         </form>
+
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={onTryDemo}
+            disabled={isLoggingIn}
+            className="flex w-full justify-center rounded-md bg-white px-3 py-1.5 text-sm font-semibold leading-6 text-indigo-600 shadow-sm ring-1 ring-inset ring-indigo-200 hover:bg-indigo-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Try Demo — no account needed
+          </button>
+          <p className="mt-2 text-center text-xs text-gray-500">
+            Opens a shared demo workspace; uploads are reset periodically.
+          </p>
+          {demoError && (
+            <p className="mt-2 text-center text-sm text-red-600" role="alert">
+              {demoError}
+            </p>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ package com.invoiceiq.document.service;
 import com.invoiceiq.document.entity.Document;
 import com.invoiceiq.document.entity.DocumentStatus;
 import com.invoiceiq.document.repository.DocumentRepository;
+import com.invoiceiq.demo.service.DemoQuotaService;
 import com.invoiceiq.invoice.entity.Invoice;
 import com.invoiceiq.invoice.entity.InvoiceStatus;
 import com.invoiceiq.invoice.repository.InvoiceRepository;
@@ -25,6 +26,7 @@ public class DocumentService {
     private final DocumentStorageService documentStorageService;
     private final JobScheduler jobScheduler;
     private final ExtractionJobService extractionJobService;
+    private final DemoQuotaService demoQuotaService;
 
     @Transactional
     public Document uploadDocument(MultipartFile file, UUID invoiceId, UUID tenantId) {
@@ -68,6 +70,9 @@ public class DocumentService {
                 hexString.append(hex);
             }
             String checksum = hexString.toString();
+
+            // Demo-tenant upload quota (no-op unless the demo tenant is configured)
+            demoQuotaService.checkAndRecord(tenantId, file.getSize());
 
             // Store file
             String storageKey = documentStorageService.storeFile(file, tenantId.toString());

@@ -136,6 +136,19 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(error, HttpStatus.CONFLICT);
     }
     
+    @ExceptionHandler(DemoQuotaExceededException.class)
+    public ResponseEntity<ApiError> handleDemoQuotaExceeded(DemoQuotaExceededException ex, HttpServletRequest request) {
+        log.warn("Demo quota exceeded: {}", ex.getMessage());
+        ApiError error = ApiError.builder()
+                .timestamp(OffsetDateTime.now())
+                .status(HttpStatus.TOO_MANY_REQUESTS.value())
+                .error(HttpStatus.TOO_MANY_REQUESTS.getReasonPhrase())
+                .message(ex.getMessage())
+                .path(request.getRequestURI())
+                .build();
+        return new ResponseEntity<>(error, HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiError> handleGenericException(Exception ex, HttpServletRequest request) {
         log.error("Unexpected error occurred while processing request to {}", request.getRequestURI(), ex);
