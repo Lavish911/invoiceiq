@@ -1,174 +1,267 @@
 # InvoiceIQ
 
-Multi-tenant invoice automation platform — Spring Boot backend with JWT/RBAC, PostgreSQL, Flyway, a FastAPI/Tesseract OCR sidecar, JobRunr background processing, and concurrency-safe approval workflows.
+> **Production-deployed, multi-tenant invoice automation platform** built with Java 21, Spring Boot, PostgreSQL, Python FastAPI/Tesseract OCR, JobRunr, AWS S3, Docker, and Next.js.
 
-## Overview
+InvoiceIQ turns invoice documents into structured financial data and routes them through a secure invoice lifecycle: **upload → asynchronous OCR → extraction → validation → review → approval**.
 
-Manual invoice processing is slow, error-prone, and hard to audit across organizational hierarchies. InvoiceIQ centralizes it: vendors and invoices with line items, document upload with OCR extraction, idempotent creation, optimistic-locked updates, a rule-driven approval workflow, and an audit trail — with strict per-tenant data isolation throughout.
+## 🚀 Live Demo
 
-## Key Features (all implemented and tested)
+**Frontend:** https://frontend-production-044d3.up.railway.app
 
-- **Java 21 / Spring Boot 3.3.4** modular monolith (`auth`, `tenant`, `invoice`, `vendor`, `document`, `workflow`, `audit`, `notification`, `common`)
-- **Multi-tenancy**: shared-schema logical isolation; tenant bound from verified JWT claims into a `ThreadLocal`, cleared per request, plus a fail-closed Hibernate filter and tenant-scoped repository queries
-- **JWT authentication**: short-lived access tokens + SHA-256-hashed, rotating refresh tokens; `token_type` separation so refresh tokens can't access the API
-- **RBAC**: `ADMIN` / `APPROVER` / `SUBMITTER` enforced at controller and service level; 401 vs 403 semantics
-- **Invoice management**: CRUD with line items, server-computed totals (`BigDecimal` / `NUMERIC(19,4)`), DRAFT → NEEDS_REVIEW → PENDING_APPROVAL → APPROVED / REJECTED
-- **OCR processing**: FastAPI + Tesseract sidecar; deterministic regex/Decimal extraction with per-field heuristic confidence
-- **Approval workflow**: tenant-scoped rules (amount/currency/priority), sequential approval steps, approve/reject with 409 conflict semantics
-- **Audit trail**: state-transition events recorded in the same transaction (convention-based, not DB-enforced immutability)
-- **PostgreSQL 15 + Flyway** (V1–V6, validated against real Postgres in tests)
-- **Idempotency**: `X-Idempotency-Key` with payload-hash conflict detection + partial unique index
-- **Optimistic locking**: `@Version` + explicit version checks → HTTP 409 on races
-- **Upload security**: type/size/filename validation, basename sanitization, storage containment checks
-- **Docker Compose** for PostgreSQL, Redis, the OCR service, and the Spring Boot backend container
-- **Tests**: 48 Java integration tests + 6 Python tests, green, zero skipped
+**Backend API:** https://backend-production-3d1d.up.railway.app
 
-## Architecture
+> The live application is deployed on Railway. The frontend proxies `/api/*` requests to the production Spring Boot backend. OCR runs as a private Railway service and documents are stored in a private AWS S3 bucket.
 
-```mermaid
-graph TD
-    Client[Client] -->|HTTPS REST| SpringBoot[Spring Boot Backend]
-    subgraph InvoiceIQ Backend
-        SpringBoot
-        JobRunr[JobRunr Background Processor]
-    end
-    SpringBoot -->|JDBC + Flyway| PostgreSQL[(PostgreSQL 15)]
-    SpringBoot -->|File I/O| LocalStorage[Local Filesystem Storage]
-    JobRunr -->|HTTP POST| FastAPI[Python FastAPI OCR Service]
-    FastAPI -->|pytesseract| Tesseract[Tesseract OCR]
+## ✨ What It Does
+
+- Multi-tenant invoice management with strict tenant isolation
+- JWT authentication with rotating refresh tokens
+- Role-based access control: `ADMIN`, `APPROVER`, `SUBMITTER`
+- Invoice CRUD with server-computed financial totals
+- Secure PDF/image document upload
+- Asynchronous OCR processing using JobRunr + FastAPI + Tesseract
+- Deterministic extraction of invoice number, vendor, dates, currency, subtotal, tax, and total
+- Approval workflow with rule-based routing and automatic approval when no rule matches
+- Optimistic locking and idempotency for concurrency-safe operations
+- Audit trail for invoice/workflow state transitions
+- Durable private document storage with AWS S3
+- Production frontend deployed with Next.js standalone Docker runtime
+
+## 🏗️ Architecture
+
+```text
+                    ┌─────────────────────────┐
+                    │      User Browser       │
+                    │   Next.js Frontend      │
+                    └────────────┬────────────┘
+                                 │ HTTPS
+                                 ▼
+                    ┌─────────────────────────┐
+                    │ Railway Frontend        │
+                    │ Next.js + API Rewrite   │
+                    └────────────┬────────────┘
+                                 │ /api/*
+                                 ▼
+                    ┌─────────────────────────┐
+                    │ Railway Backend         │
+                    │ Java 21 / Spring Boot   │
+                    │ JWT / RBAC / REST       │
+                    └──────┬──────────┬───────┘
+                           │          │
+                    JDBC / Flyway    JobRunr
+                           │          │
+                           ▼          ▼
+                    ┌───────────┐  ┌────────────────┐
+                    │PostgreSQL │  │ Private OCR     │
+                    │           │  │ FastAPI         │
+                    └───────────┘  │ Tesseract       │
+                                   └───────┬────────┘
+                                           │
+                                           ▼
+                                   ┌────────────────┐
+                                   │ Private AWS S3 │
+                                   │ Document Store │
+                                   └────────────────┘
 ```
 
-Notes: the backend itself runs as a Docker container (`Dockerfile` + Compose `backend` service on :8080, `docker` Spring profile, healthy-dependency on PostgreSQL and OCR, runs the JobRunr background server). **JobRunr persists jobs in PostgreSQL** (Spring Boot auto-configuration), not Redis — Redis ships in Compose but is currently unused by business logic and reserved for future caching/rate-limiting. Storage is `STORAGE_TYPE=local` (local filesystem) for development; the S3 abstraction is implemented and code-reviewed, but live S3 integration testing remains part of M7 and is not yet verified.
+### Design
 
-## Invoice Lifecycle
+InvoiceIQ is a **modular monolith**, not a collection of unnecessary microservices.
 
+The Spring Boot application owns authentication, authorization, tenancy, invoice state, persistence, workflow, auditing, storage coordination, and background-job orchestration.
+
+The Python service is intentionally narrow: it receives a document, runs OCR with Tesseract, extracts supported fields, and returns a validated response contract.
+
+JobRunr persists background jobs in PostgreSQL, allowing document extraction to run asynchronously without blocking the upload request.
+
+## 🔐 Security & Reliability
+
+### Authentication
+- JWT access + refresh token architecture
+- Refresh-token rotation with SHA-256 hashing at rest
+- Access/refresh token type separation
+- BCrypt password hashing
+- Stateless Spring Security
+
+### Multi-tenancy
+- Tenant identity comes from verified JWT claims
+- Database user lookup is tenant-scoped
+- Tenant-aware repository queries
+- Fail-closed Hibernate tenant filtering
+- Cross-tenant access is rejected
+
+### Financial correctness
+- Java `BigDecimal`
+- PostgreSQL `NUMERIC(19,4)`
+- Server-computed invoice totals
+- Explicit optimistic-lock/version checks
+- HTTP `409 Conflict` for stale writes and concurrency conflicts
+
+### Idempotency
+Invoice creation supports `X-Idempotency-Key` with payload-hash validation:
+- same key + same payload → idempotent replay
+- same key + different payload → `409 Conflict`
+
+### Upload security
+- PDF/JPEG/PNG allowlist
+- 10 MB upload limit
+- basename sanitization
+- storage containment checks
+- asynchronous processing after transaction commit
+
+## 🔄 Invoice Lifecycle
+
+```text
+DRAFT
+  │
+  ├── Upload document
+  │      └── JobRunr → OCR → extraction → writeback
+  │
+  ▼
+NEEDS_REVIEW
+  │
+  ├── Matching workflow rule
+  │        ▼
+  │   PENDING_APPROVAL
+  │        │
+  │        ├── Approve → APPROVED
+  │        └── Reject  → REJECTED
+  │
+  └── No matching rule → APPROVED
 ```
-DRAFT → NEEDS_REVIEW → PENDING_APPROVAL → APPROVED
-   \\         \\               └──→ REJECTED
-    \\         └── (no matching rule → auto-APPROVED)
-     └── created via POST /api/invoices (totals computed server-side)
+
+## 🧪 Verification
+
+The project was built and hardened through milestone-based testing rather than relying only on happy-path manual checks.
+
+Verified areas include:
+
+- Java integration and security tests
+- Python OCR tests
+- PostgreSQL/Flyway validation
+- Tenant-isolation tests
+- Duplicate and idempotency race tests
+- Optimistic-locking concurrency tests
+- Real OCR integration
+- Production S3 upload/read/delete and restart durability
+- Production browser upload using real `multipart/form-data`
+- Production OCR extraction with exact financial values
+- Production frontend → backend → JobRunr → OCR → S3 → PostgreSQL flow
+
+### Production OCR acceptance
+
+A real browser upload against the public frontend was processed through the deployed production stack and produced:
+
+```text
+Subtotal   2000.00
+Tax         469.12
+Total      2469.12
 ```
 
-- `DRAFT`: created via `POST /api/invoices` (line items required; totals derived, never trusted from the client).
-- Documents may be uploaded to `DRAFT`/`REJECTED` invoices; extraction runs in a JobRunr worker and writes back draft fields.
-- `POST /api/invoices/{id}/submit` (owner submitter or ADMIN): `DRAFT → NEEDS_REVIEW`, `SUBMITTED` audit event.
-- `POST /api/invoices/{id}/workflow/initiate`: rule match → `PENDING_APPROVAL` + steps; no match → auto-`APPROVED`.
-- `POST …/approval/approve` / `…/reject` (APPROVER/ADMIN): terminal `APPROVED` / `REJECTED`; repeat or stale-version actions → `409`.
+The extracted values were written back to the production invoice successfully.
 
-## OCR Pipeline
-
-Upload (`multipart/form-data`, PDF/PNG/JPG ≤ 10 MB, non-empty) → extension + containment-validated write under `data/storage/<tenantId>/` → SHA-256 checksum → document row (`UPLOADED`) → JobRunr job enqueued **after commit** → worker claims the document atomically (stale-lease reclaim after 5 min), calls FastAPI outside any DB transaction (5 s connect / 60 s read timeouts), persists `ExtractionResult` (`COMPLETED`/`FAILED`) and draft invoice fields. Success paths write decimal-string amounts parsed into `BigDecimal`; malformed values are ignored, never written.
-
-## Security
-
-- BCrypt password hashing; login requires `email` + `password` + `tenantId` (same email can exist in two tenants).
-- Access (24 h default) vs refresh (7 d) JWTs with `token_type` enforcement; refresh tokens stored hashed, revoked on rotation, reuse rejected.
-- Tenant identity comes only from the verified JWT + DB row match; `TenantContextFilter` only ever *clears* context; spoofed tenant headers change nothing.
-- Uploads: allowlist, size cap, basename sanitization, storage containment on write and read.
-
-## Concurrency & Reliability
-
-- `@Version` on `Invoice`, `WorkflowInstance`, `ApprovalStep`, `Document`, `ExtractionResult` plus explicit expected-version checks → `409 Conflict` (never silent overwrite).
-- `(tenant_id, vendor_id, invoice_number)` uniqueness + `(tenant_id, idempotency_key)` partial unique index back the application-level checks, so races collapse to 409s (proven by latch-raced tests).
-- Extraction uses an atomic conditional-UPDATE claim; transient 5xx/timeouts rethrow for JobRunr retry, deterministic failures go terminal.
-
-## Approval Workflow
-
-Submit → initiate (rule match on amount/currency/priority) → sequential steps → approve/reject with actor, timestamp, comment, audit event, and submitter notification record. Terminal workflows reject further actions with 409.
-
-## Auditability
-
-`SUBMITTED`, `WORKFLOW_CREATED`, `AUTO_APPROVE`, `STEP_APPROVED`, `APPROVED`, `REJECTED` events (actor, entity, old/new state, comment, timestamp) written in the same transaction as the state change. Read via `GET /api/invoices/{invoiceId}/audit` (tenant-scoped, invoice-membership enforced). No delete/update API exists for audit rows.
-
-## Technology Stack
+## 🛠️ Technology Stack
 
 | Layer | Technology |
 |---|---|
-| Backend | Java 21, Spring Boot 3.3.4, Spring Data JPA/Hibernate, Spring Security |
-| Database | PostgreSQL 15 (H2 for fast unit tests) |
-| Migrations | Flyway (V1–V6) |
-| AI/OCR service | Python 3.11, FastAPI, Tesseract OCR, PyMuPDF, Pillow |
-| Background processing | JobRunr (PostgreSQL-backed) |
-| Auth | JWT (jjwt), BCrypt |
-| API docs | SpringDoc OpenAPI (`/swagger-ui.html`) |
-| Testing | JUnit 5, MockMvc, Testcontainers, pytest |
-| Infra | Docker, Docker Compose |
+| Frontend | Next.js 16, React 19, TypeScript |
+| Backend | Java 21, Spring Boot 3.3.4 |
+| Security | Spring Security, JWT, BCrypt |
+| Persistence | PostgreSQL, Spring Data JPA / Hibernate |
+| Migrations | Flyway |
+| Async Jobs | JobRunr |
+| OCR Service | Python 3.11, FastAPI, Tesseract, PyMuPDF |
+| Storage | AWS S3 |
+| Containers | Docker, Docker Compose |
+| Deployment | Railway + AWS |
+| Testing | JUnit 5, MockMvc, Testcontainers, pytest, Vitest |
 
-## Project Structure
+## 📁 Project Structure
 
+```text
+invoiceiq/
+├── src/main/java/com/invoiceiq/
+│   ├── auth/
+│   ├── tenant/
+│   ├── invoice/
+│   ├── vendor/
+│   ├── document/
+│   ├── workflow/
+│   ├── audit/
+│   ├── notification/
+│   └── common/
+├── src/main/resources/db/migration/
+├── python-ocr/
+├── frontend/
+├── docs/
+├── Dockerfile
+├── docker-compose.yml
+└── README.md
 ```
-src/main/java/com/invoiceiq/
-  auth/          login, JWT, refresh rotation, RBAC config
-  tenant/        TenantContext, cleanup filter, tenant-filter aspect
-  invoice/       CRUD, submit, idempotency, pagination/sort guards
-  vendor/        supplier entities
-  document/      upload, storage, JobRunr extraction worker, OCR client
-  workflow/      rules, instances, approval steps, state transitions
-  audit/         event recording + scoped read API
-  notification/  persisted IN_APP records, sync-after-commit delivery
-  common/        entities, 401/403/404/409 error contract
-src/main/resources/db/migration/   V1–V6 Flyway SQL
-python-ocr/      FastAPI app, Dockerfile (installs tesseract-ocr), pytest suite
-```
 
-## Getting Started
+## ▶️ Run Locally
 
-Prerequisites: Java 21, Maven wrapper included, Docker + Compose, Python 3.11 (only for running the OCR service/tests locally).
+### Full Docker stack
 
 ```bash
-docker compose up -d --build                    # full stack: postgres :5432, redis :6379, python-ocr :8000, backend :8080
-docker compose up -d postgres redis python-ocr  # infrastructure + OCR only (local backend dev)
-docker compose up -d --build backend            # backend container only (needs healthy postgres + python-ocr)
-./mvnw.cmd clean verify         # full Java suite (needs Docker for PG/OCR tests)
-cd python-ocr && python -m pytest   # Python suite (needs tesseract binary for 1 test)
-./mvnw.cmd spring-boot:run -Dspring-boot.run.profiles=local   # API on :8080
+docker compose up -d --build
 ```
 
-There is no self-registration endpoint; seed users directly in the database (see `docs/DEMO.md`).
+Backend:
 
-## Environment Variables
+```
+http://localhost:8080
+```
+
+Frontend:
 
 ```bash
-JWT_SECRET_KEY=<your-base64-hs256-secret>   # required, no default
-AI_SERVICE_TOKEN=<shared-java-python-token> # must match on both sides
-AI_SERVICE_URL=http://python-ocr:8000       # docker profile (backend → OCR); code default http://localhost:8000 for local runs
-OCR_CONNECT_TIMEOUT=5                       # docker profile (seconds)
-OCR_READ_TIMEOUT=120                        # docker profile (seconds)
-STORAGE_TYPE=local                           # local | s3 (S3 abstraction exists; live S3 verification is M7)
-STORAGE_LOCAL_DIR=./data/storage            # host path; container default /app/data/storage under docker profile
-S3_BUCKET / S3_REGION / S3_ACCESS_KEY / S3_SECRET_KEY / S3_ENDPOINT  # only used when STORAGE_TYPE=s3
-POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB  # Compose / docker profile (POSTGRES_URL is composed as jdbc:postgresql://postgres:5432/<db>)
+cd frontend
+npm install
+npm run dev
 ```
 
-Test-only values live under `src/test/resources` and never authenticate production. Never commit real secrets — see `docs/GITHUB_SETUP.md`.
+Frontend development server:
 
-## API Overview
+```
+http://localhost:3000
+```
 
-- `POST /api/auth/login` → `{accessToken, refreshToken}`; `POST /api/auth/refresh` → rotated pair
-- `POST /api/invoices` (201 new / 200 idempotent replay), `GET /api/invoices` (paged, capped, whitelisted sort), `GET /api/invoices/{id}`, `PUT /api/invoices/{id}`, `POST /api/invoices/{id}/submit`, `DELETE /api/invoices/{id}` (ADMIN)
-- `POST /api/invoices/{invoiceId}/documents` (202), `GET …/{documentId}`, `GET …/{documentId}/extraction`
-- `POST /api/invoices/{invoiceId}/workflow/initiate`, `GET …/workflow`, `POST …/approval/approve`, `POST …/approval/reject`
-- `POST/GET/PUT/DELETE /api/workflow-rules` (ADMIN), `GET /api/invoices/{invoiceId}/audit`
-- Errors: 400 validation, 401 unauthenticated, 403 forbidden, 404 cross-tenant-or-missing, 409 conflicts — all in a uniform `ApiError` envelope. Full reference: `docs/API.md`.
+See `docs/DEPLOYMENT.md` for environment configuration and deployment details.
 
-## Testing
+## 📚 Documentation
 
-Verified evidence: **48 Java tests, 0 failures, 0 errors, 0 skipped** (`clean verify`, Docker available) + **6 Python tests green**. Coverage includes auth/RBAC, tenant isolation incl. spoofed headers, duplicate/idempotency matrices, latch-raced concurrency (invoice + approval), optimistic locking, traversal/validation, containerized real-OCR end-to-end, and Flyway-on-Postgres validation. Docker-dependent tests require Docker — M6.1 removed `@Testcontainers(disabledWithoutDocker = true)`, so they no longer silently skip when Docker is unavailable.
+- [Architecture](docs/ARCHITECTURE.md)
+- [API Reference](docs/API.md)
+- [Deployment Guide](docs/DEPLOYMENT.md)
+- [Engineering Decisions](docs/ENGINEERING_DECISIONS.md)
+- [Demo Guide](docs/DEMO.md)
 
-## Engineering Decisions
+## ⚠️ Current Limitations
 
-See `docs/ARCHITECTURE.md`, `docs/ENGINEERING_DECISIONS.md`, `docs/API.md`, `docs/DEMO.md`.
+- OCR extraction is heuristic/regex-based rather than ML-trained document understanding.
+- Line-item extraction is not yet part of the OCR pipeline.
+- Notifications are persisted in-app records; SMTP/Slack delivery is not implemented.
+- Redis is reserved for future caching/rate-limiting and is not used by current business logic.
+- Audit immutability is enforced by application design (no mutating API), not a database-level immutable table.
 
-## Known Limitations
+## 🔮 Future Improvements
 
-- Local filesystem storage for development (`STORAGE_TYPE=local`); S3 storage is implemented and deployment-ready, but live S3 integration testing remains part of M7 (not yet verified). No MinIO service in the current Compose stack.
-- Backend runs as a Docker container (`Dockerfile` + Compose `backend` service) as well as via `spring-boot:run`.
-- Notifications are persisted records with sync-after-commit simulated delivery — no SMTP/Slack dispatch.
-- OCR extracts header fields and totals (regex heuristics + fixed confidence weights), not line items; no ML training.
-- Single-instance JobRunr against Postgres; Redis reserved, not wired.
-- Audit immutability is by convention (no mutating endpoints), not DB-enforced.
-- Uncommitted local extras (`data/`, logs) are git-ignored runtime artifacts, not part of the build.
+- ML/layout-aware document extraction
+- Line-item extraction
+- External notification delivery
+- Rate limiting
+- Approval SLA/escalation
+- Expanded observability and CI/CD automation
 
-## Future Improvements
+## 👤 Author
 
-Real notification dispatch, line-item extraction, composite tenant FKs, rate limiting, CI pipeline, approval SLA/escalation. All explicitly out of V1.0 scope. M7 cloud deployment is live on Railway + AWS S3 (verified end-to-end incl. restart durability); see `docs/DEPLOYMENT.md` for the as-built topology and verification evidence.
+**Lavish Rahangdale**
+
+B.Tech — Artificial Intelligence
+
+[GitHub](https://github.com/Lavish911)
+
+---
+
+**InvoiceIQ** demonstrates production-oriented backend engineering across authentication, multi-tenancy, concurrency, asynchronous processing, OCR integration, cloud storage, Docker, and cloud deployment.
