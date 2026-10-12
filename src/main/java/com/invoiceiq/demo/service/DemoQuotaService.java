@@ -48,13 +48,6 @@ public class DemoQuotaService {
     private long maxBytesTotal;
 
     /**
-     * Runs in its own transaction so first-insert races surface eagerly inside
-     * this method (catchable below) instead of at the outer upload commit.
-     * Trade-off: an upload that fails after admission keeps its quota charge —
-     * acceptable over-counting for abuse control, and uploads that fail
-     * validation never reach this call.
-     */
-    /**
      * Runs in its own transaction so lock waits stay short and first-insert
      * races surface eagerly inside this method (catchable below) instead of
      * at the outer upload commit. Trade-off: an upload that fails after
