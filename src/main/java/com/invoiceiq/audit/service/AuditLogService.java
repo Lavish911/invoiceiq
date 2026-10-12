@@ -2,7 +2,6 @@ package com.invoiceiq.audit.service;
 
 import com.invoiceiq.audit.entity.AuditLog;
 import com.invoiceiq.audit.repository.AuditLogRepository;
-import com.invoiceiq.auth.entity.User;
 import com.invoiceiq.auth.repository.UserRepository;
 import com.invoiceiq.tenant.context.TenantContext;
 import lombok.RequiredArgsConstructor;
